@@ -64,15 +64,48 @@ const ConsultationPage = () => {
         setLoading(true);
         setError('');
 
-        if (!newConsultation.idDoctor || !newConsultation.idPaciente) {
-            setError('Debe seleccionar doctor y paciente');
+        // Validar campos vacíos
+        if (!newConsultation.fecha.trim()) {
+            setError('Debe llenar el campo Fecha antes de guardar consulta');
+            setLoading(false);
+            return;
+        }
+
+        if (!newConsultation.hora.trim()) {
+            setError('Debe llenar el campo Hora antes de guardar consulta');
+            setLoading(false);
+            return;
+        }
+
+        if (!newConsultation.diagnostico.trim()) {
+            setError('Debe llenar el campo Diagnóstico antes de guardar consulta');
+            setLoading(false);
+            return;
+        }
+
+        if (!newConsultation.idDoctor) {
+            setError('Debe seleccionar un Doctor antes de guardar consulta');
+            setLoading(false);
+            return;
+        }
+
+        if (!newConsultation.idPaciente) {
+            setError('Debe seleccionar un Paciente antes de guardar consulta');
+            setLoading(false);
+            return;
+        }
+
+        // Validacion
+        const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+        if (!soloLetras.test(newConsultation.diagnostico)) {
+            setError('El campo Diagnóstico solo debe contener letras');
             setLoading(false);
             return;
         }
 
         const payload = {
             fecha: newConsultation.fecha,
-            hora: newConsultation.hora + ':00', // Ensure seconds are included if backend expects HH:mm:ss
+            hora: newConsultation.hora + ':00', 
             diagnostico: newConsultation.diagnostico,
             doctor: {
                 idDoctor: Number(newConsultation.idDoctor)
@@ -173,7 +206,7 @@ const ConsultationPage = () => {
                 </form>
             </div>
 
-            {/* List Table */}
+            {/* Tabla */}
             <h3>Historial de Consultas</h3>
             <table>
                 <thead>
@@ -184,6 +217,7 @@ const ConsultationPage = () => {
                         <th>Diagnóstico</th>
                         <th>Doctor</th>
                         <th>Paciente</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
