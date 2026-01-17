@@ -217,7 +217,7 @@ const ConsultationPage = () => {
                         <th>Diagnóstico</th>
                         <th>Doctor</th>
                         <th>Paciente</th>
-                        <th>Acciones</th>
+                      
                     </tr>
                 </thead>
                 <tbody>
