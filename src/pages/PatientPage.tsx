@@ -12,6 +12,7 @@ const PatientPage = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [telefonoError, setTelefonoError] = useState('');
 
     const fetchPatients = async () => {
         try {
@@ -28,23 +29,68 @@ const PatientPage = () => {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setNewPatient({
-            ...newPatient,
-            [e.target.name]: e.target.value
-        });
+        const { name, value } = e.target;
+        
+        // Validación especial para el campo teléfono
+        if (name === 'telefono') {
+            // Solo permitir números
+            const soloNumeros = value.replace(/[^0-9]/g, '');
+            setNewPatient({
+                ...newPatient,
+                [name]: soloNumeros
+            });
+            
+            // Validar longitud en tiempo real
+            if (soloNumeros.length > 0 && (soloNumeros.length < 7 || soloNumeros.length > 15)) {
+                setTelefonoError('El teléfono debe tener entre 7 y 15 dígitos');
+            } else {
+                setTelefonoError('');
+            }
+        } else {
+            setNewPatient({
+                ...newPatient,
+                [name]: value
+            });
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setTelefonoError('');
+        
+        // Validación del teléfono antes de enviar
+        const telefonoLimpio = newPatient.telefono.replace(/[^0-9]/g, '');
+        if (!telefonoLimpio || telefonoLimpio.length < 7 || telefonoLimpio.length > 15) {
+            setTelefonoError('El teléfono debe tener entre 7 y 15 dígitos y solo contener números');
+            setLoading(false);
+            return;
+        }
+        
         try {
-            await api.post('/pacientes/registrar', newPatient);
+            // Asegurar que el teléfono solo tenga números
+            const pacienteConTelefonoLimpio = {
+                ...newPatient,
+                telefono: telefonoLimpio
+            };
+            await api.post('/pacientes/registrar', pacienteConTelefonoLimpio);
             setNewPatient({ nombre: '', apellido: '', email: '', telefono: '' });
+            setTelefonoError('');
             fetchPatients();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('Error al crear paciente');
+            if (err.response?.data) {
+                // Si hay errores de validación del backend, mostrarlos
+                const backendErrors = err.response.data;
+                if (backendErrors.telefono) {
+                    setTelefonoError(backendErrors.telefono);
+                } else {
+                    setError(err.response.data.message || 'Error al crear paciente');
+                }
+            } else {
+                setError('Error al crear paciente');
+            }
         } finally {
             setLoading(false);
         }
@@ -93,12 +139,20 @@ const PatientPage = () => {
                         <div className="form-group">
                             <label>Teléfono:</label>
                             <input
-                                type="text"
+                                type="tel"
                                 name="telefono"
                                 value={newPatient.telefono}
                                 onChange={handleChange}
+                                placeholder="Solo números (7-15 dígitos)"
                                 required
+                                pattern="[0-9]{7,15}"
+                                maxLength={15}
                             />
+                            {telefonoError && (
+                                <span style={{ color: 'red', fontSize: '0.875rem', display: 'block', marginTop: '0.25rem' }}>
+                                    {telefonoError}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '1rem' }}>
