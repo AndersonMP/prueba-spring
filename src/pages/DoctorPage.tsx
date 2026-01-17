@@ -1,116 +1,75 @@
-import { useEffect, useState } from 'react';
-import api from '../services/api';
-import type{ Doctor, Especialidad } from '../types';
+import { useState, type FormEvent } from 'react';
+import useDoctors from '../hooks/useDoctor';
+import useSpecialties from '../hooks/useSpecialties';
+import useForm from '../hooks/useForm';
+import { createDoctor, updateDoctor, deleteDoctor, } from '../utils/doctorUtils';
 
 const DoctorPage = () => {
-    const [doctors, setDoctors] = useState<Doctor[]>([]);
-    const [specialties, setSpecialties] = useState<Especialidad[]>([]);
-
-    // Form State
-    const [isEditing, setIsEditing] = useState(false);
-    const [currentDoctorId, setCurrentDoctorId] = useState<number | null>(null);
-    const [formData, setFormData] = useState({
+    const { doctors, fetchDoctors } = useDoctors();
+    const { specialties } = useSpecialties();
+    const { formData, fieldErrors, loading, error, handleChange, validate, resetForm, setError } = useForm({
         nombre: '',
         apellido: '',
         idEspecialidad: ''
     });
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentDoctorId, setCurrentDoctorId] = useState<number | null>(null);
 
-    useEffect(() => {
-        fetchDoctors();
-        fetchSpecialties();
-    }, []);
-
-    const fetchDoctors = async () => {
-        try {
-            const response = await api.get('/doctores');
-            setDoctors(response.data);
-        } catch (err) {
-            console.error(err);
-            setError('Error al cargar doctores');
-        }
-    };
-
-    const fetchSpecialties = async () => {
-        try {
-            const response = await api.get('/especialidades');
-            setSpecialties(response.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        setLoading(true);
         setError('');
-
-        if (!formData.idEspecialidad) {
-            setError('Debe seleccionar una especialidad');
-            setLoading(false);
-            return;
-        }
+        if (validate()) return;
 
         const payload = {
             nombre: formData.nombre,
             apellido: formData.apellido,
-            especialidad: {
-                idEspecialidad: Number(formData.idEspecialidad)
-            }
+            especialidad: { idEspecialidad: Number(formData.idEspecialidad) }
         };
 
         try {
             if (isEditing && currentDoctorId) {
-                await api.put(`/doctores/actualizar/${currentDoctorId}`, payload);
+                await updateDoctor(currentDoctorId, payload);
             } else {
-                await api.post('/doctores/registrar', payload);
+                await createDoctor(payload);
             }
-            resetForm();
+            resetForm({ nombre: '', apellido: '', idEspecialidad: '' });
             fetchDoctors();
-        } catch (err) {
-            console.error(err);
-            setError('Error al guardar doctor');
-        } finally {
-            setLoading(false);
+        } catch (err: any) {
+            setError(err.message || 'Error desconocido');
         }
     };
 
-    const handleEdit = (doctor: Doctor) => {
+    const handleEdit = (doctor: any) => {
         setIsEditing(true);
-        setCurrentDoctorId(doctor.idDoctor!);
-        setFormData({
-            nombre: doctor.nombre,
-            apellido: doctor.apellido,
+        setCurrentDoctorId(doctor.idDoctor);
+        resetForm({
+            nombre: doctor.nombre || '',
+            apellido: doctor.apellido || '',
             idEspecialidad: doctor.especialidad?.idEspecialidad?.toString() || ''
         });
     };
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm('¿Está seguro de eliminar este doctor?')) return;
-        try {
-            await api.delete(`/doctores/eliminar/${id}`);
-            fetchDoctors();
-        } catch (err) {
-            console.error(err);
-            setError('Error al eliminar doctor');
+        if (window.confirm('¿Está seguro de eliminar este doctor?')) {
+            try {
+                await deleteDoctor(id);
+                fetchDoctors();
+            } catch (err) {
+                setError('Error al eliminar doctor');
+            }
         }
     };
 
-    const resetForm = () => {
+    const handleCancel = () => {
         setIsEditing(false);
         setCurrentDoctorId(null);
-        setFormData({ nombre: '', apellido: '', idEspecialidad: '' });
+        resetForm({
+            nombre: '',
+            apellido: '',
+            idEspecialidad: ''
+        });
     };
-
     return (
         <div className="page-container">
             <h2>Gestión de Doctores</h2>
@@ -119,7 +78,7 @@ const DoctorPage = () => {
             <div className="form-container" style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid #eee', borderRadius: '4px' }}>
                 <h3>{isEditing ? 'Editar Doctor' : 'Nuevo Doctor'}</h3>
                 {error && <p style={{ color: 'red' }}>{error}</p>}
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} noValidate>
                     <div className="form-group">
                         <label>Nombre:</label>
                         <input
@@ -127,8 +86,9 @@ const DoctorPage = () => {
                             name="nombre"
                             value={formData.nombre}
                             onChange={handleChange}
-                            required
+                            className={fieldErrors.nombre ? 'input-error' : ''}
                         />
+                        {fieldErrors.nombre && <div className="error-msg">El nombre es obligatorio</div>}
                     </div>
                     <div className="form-group">
                         <label>Apellido:</label>
@@ -137,8 +97,9 @@ const DoctorPage = () => {
                             name="apellido"
                             value={formData.apellido}
                             onChange={handleChange}
-                            required
+                            className={fieldErrors.apellido ? 'input-error' : ''}
                         />
+                        {fieldErrors.apellido && <div className="error-msg">El apellido es obligatorio</div>}
                     </div>
                     <div className="form-group">
                         <label>Especialidad:</label>
@@ -146,7 +107,7 @@ const DoctorPage = () => {
                             name="idEspecialidad"
                             value={formData.idEspecialidad}
                             onChange={handleChange}
-                            required
+                            className={fieldErrors.idEspecialidad ? 'input-error' : ''}
                         >
                             <option value="">-- Seleccione --</option>
                             {specialties.map(spec => (
@@ -155,13 +116,14 @@ const DoctorPage = () => {
                                 </option>
                             ))}
                         </select>
+                        {fieldErrors.idEspecialidad && <div className="error-msg">Seleccione una especialidad</div>}
                     </div>
                     <div className="action-buttons">
                         <button type="submit" className="btn-primary" disabled={loading}>
                             {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Registrar')}
                         </button>
                         {isEditing && (
-                            <button type="button" className="btn-secondary" onClick={resetForm}>
+                            <button type="button" className="btn-secondary" onClick={handleCancel}>
                                 Cancelar
                             </button>
                         )}
